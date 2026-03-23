@@ -9,36 +9,33 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
-      - name: Send to OpenClaw
+      - name: Build payload and notify OpenClaw
         run: |
-          ACTION="${{ github.event_name }}/${{ github.event.action }}"
-          ISSUE_NUM="${{ github.event.issue.number }}"
-          ISSUE_TITLE="${{ github.event.issue.title }}"
-          ISSUE_URL="${{ github.event.issue.html_url }}"
-          SENDER="${{ github.event.sender.login }}"
-
           if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            COMMENT_BODY="${{ github.event.comment.body }}"
-            MESSAGE="GitHub event: ${ACTION}
-          Issue #${ISSUE_NUM}: ${ISSUE_TITLE}
-          URL: ${ISSUE_URL}
-          Comment by: ${SENDER}
-          Comment: ${COMMENT_BODY}
-
-          Instructions: A user commented on a GitHub issue. Read the comment and reply helpfully if it asks a question or adds new info. Post your reply as a GitHub comment using the API (repo: bilaljawed/pdf-editor, token at /data/workspace/.github-token). Keep it concise."
+            PAYLOAD=$(jq -n \
+              --arg action "issue_comment.created" \
+              --arg issue_number "${{ github.event.issue.number }}" \
+              --arg issue_title "${{ github.event.issue.title }}" \
+              --arg issue_url "${{ github.event.issue.html_url }}" \
+              --arg sender "${{ github.event.sender.login }}" \
+              --arg comment "${{ github.event.comment.body }}" \
+              '{action: $action, issue: {number: $issue_number, title: $issue_title, html_url: $issue_url, user: {login: $sender}}, comment: {body: $comment, user: {login: $sender}}}')
           else
-            ISSUE_BODY="${{ github.event.issue.body }}"
-            MESSAGE="GitHub event: ${ACTION}
-          Issue #${ISSUE_NUM}: ${ISSUE_TITLE}
-          URL: ${ISSUE_URL}
-          Opened by: ${SENDER}
-          Body: ${ISSUE_BODY}
-
-          Instructions: A new GitHub issue was opened. First post a comment on issue #${ISSUE_NUM} saying exactly: 'Looking into it 👀' (use GitHub API, repo: bilaljawed/pdf-editor, token at /data/workspace/.github-token). Then investigate the issue and post your findings as a follow-up comment."
+            PAYLOAD=$(jq -n \
+              --arg action "${{ github.event.action }}" \
+              --arg issue_number "${{ github.event.issue.number }}" \
+              --arg issue_title "${{ github.event.issue.title }}" \
+              --arg issue_url "${{ github.event.issue.html_url }}" \
+              --arg issue_body "${{ github.event.issue.body }}" \
+              --arg sender "${{ github.event.sender.login }}" \
+              '{action: $action, issue: {number: $issue_number, title: $issue_title, html_url: $issue_url, body: $issue_body, user: {login: $sender}}}')
           fi
 
-          curl -s -f -X POST "${{ secrets.OPENCLAW_HOOKS_URL }}/hooks/agent" \
+          echo "Sending payload to OpenClaw..."
+          curl -s --max-time 10 -w "\nHTTP %{http_code}" \
+            -X POST "${{ secrets.OPENCLAW_HOOKS_URL }}/hooks/github-issues" \
             -H "Authorization: Bearer ${{ secrets.OPENCLAW_HOOKS_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "$(jq -n --arg msg "$MESSAGE" '{"message": $msg, "name": "GitHub", "deliver": false}')"
+            -d "$PAYLOAD"
