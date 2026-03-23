@@ -1,0 +1,49 @@
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.page-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-label {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.page-wrapper {
+  position: relative;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+  cursor: default;
+}
+
+.pdf-page-canvas {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.fabric-overlay {
+  display: block;
+}
+
+/* Fabric canvas wrapper fix */
+.page-wrapper .canvas-container {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+}
