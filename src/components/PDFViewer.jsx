@@ -3,11 +3,8 @@ import * as pdfjsLib from 'pdfjs-dist'
 import { Canvas as FabricCanvas, IText, FabricImage } from 'fabric'
 import './PDFViewer.css'
 
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).href
+// Set up PDF.js worker — use CDN URL to avoid base-path issues on GitHub Pages
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
 
 const SCALE = 1.5
 
