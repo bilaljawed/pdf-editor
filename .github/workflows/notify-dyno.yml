@@ -1,0 +1,44 @@
+name: Notify Dyno (Issue & Comment events)
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send to OpenClaw
+        run: |
+          ACTION="${{ github.event_name }}/${{ github.event.action }}"
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_URL="${{ github.event.issue.html_url }}"
+          SENDER="${{ github.event.sender.login }}"
+
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            COMMENT_BODY="${{ github.event.comment.body }}"
+            MESSAGE="GitHub event: ${ACTION}
+          Issue #${ISSUE_NUM}: ${ISSUE_TITLE}
+          URL: ${ISSUE_URL}
+          Comment by: ${SENDER}
+          Comment: ${COMMENT_BODY}
+
+          Instructions: A user commented on a GitHub issue. Read the comment and reply helpfully if it asks a question or adds new info. Post your reply as a GitHub comment using the API (repo: bilaljawed/pdf-editor, token at /data/workspace/.github-token). Keep it concise."
+          else
+            ISSUE_BODY="${{ github.event.issue.body }}"
+            MESSAGE="GitHub event: ${ACTION}
+          Issue #${ISSUE_NUM}: ${ISSUE_TITLE}
+          URL: ${ISSUE_URL}
+          Opened by: ${SENDER}
+          Body: ${ISSUE_BODY}
+
+          Instructions: A new GitHub issue was opened. First post a comment on issue #${ISSUE_NUM} saying exactly: 'Looking into it 👀' (use GitHub API, repo: bilaljawed/pdf-editor, token at /data/workspace/.github-token). Then investigate the issue and post your findings as a follow-up comment."
+          fi
+
+          curl -s -f -X POST "${{ secrets.OPENCLAW_HOOKS_URL }}/hooks/agent" \
+            -H "Authorization: Bearer ${{ secrets.OPENCLAW_HOOKS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg msg "$MESSAGE" '{"message": $msg, "name": "GitHub", "deliver": false}')"
