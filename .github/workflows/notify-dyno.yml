@@ -11,31 +11,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Build payload and notify OpenClaw
+      - name: Post acknowledgment + notify Telegram
         run: |
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            PAYLOAD=$(jq -n \
-              --arg action "issue_comment.created" \
-              --arg issue_number "${{ github.event.issue.number }}" \
-              --arg issue_title "${{ github.event.issue.title }}" \
-              --arg issue_url "${{ github.event.issue.html_url }}" \
-              --arg sender "${{ github.event.sender.login }}" \
-              --arg comment "${{ github.event.comment.body }}" \
-              '{action: $action, issue: {number: $issue_number, title: $issue_title, html_url: $issue_url, user: {login: $sender}}, comment: {body: $comment, user: {login: $sender}}}')
-          else
-            PAYLOAD=$(jq -n \
-              --arg action "${{ github.event.action }}" \
-              --arg issue_number "${{ github.event.issue.number }}" \
-              --arg issue_title "${{ github.event.issue.title }}" \
-              --arg issue_url "${{ github.event.issue.html_url }}" \
-              --arg issue_body "${{ github.event.issue.body }}" \
-              --arg sender "${{ github.event.sender.login }}" \
-              '{action: $action, issue: {number: $issue_number, title: $issue_title, html_url: $issue_url, body: $issue_body, user: {login: $sender}}}')
-          fi
+          GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_URL="${{ github.event.issue.html_url }}"
+          SENDER="${{ github.event.sender.login }}"
+          BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
+          CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
 
-          echo "Sending payload to OpenClaw..."
-          curl -s --max-time 10 -w "\nHTTP %{http_code}" \
-            -X POST "${{ secrets.OPENCLAW_HOOKS_URL }}/hooks/github-issues" \
-            -H "Authorization: Bearer ${{ secrets.OPENCLAW_HOOKS_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+          if [ "${{ github.event_name }}" = "issues" ] && [ "${{ github.event.action }}" = "opened" ]; then
+            # Post acknowledgment comment on the issue
+            curl -s -X POST "https://api.github.com/repos/${{ github.repository }}/issues/${ISSUE_NUM}/comments" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"body": "Looking into it 👀"}'
+
+            # Notify Telegram group
+            MSG="🐛 *New GitHub Issue #${ISSUE_NUM}*%0A*${ISSUE_TITLE}*%0ABy: ${SENDER}%0A${ISSUE_URL}"
+            curl -s "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${MSG}&parse_mode=Markdown"
+
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            COMMENT="${{ github.event.comment.body }}"
+            # Notify Telegram group about the comment
+            MSG="💬 *Comment on Issue #${ISSUE_NUM}*%0A*${ISSUE_TITLE}*%0ABy: ${SENDER}%0A\"${COMMENT}\"%0A${ISSUE_URL}"
+            curl -s "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${MSG}&parse_mode=Markdown"
+          fi
